@@ -1,7 +1,6 @@
 """
 PIP setup script for the SafeID package.
 """
-
 from setuptools import setup
 
 def readme():
@@ -40,7 +39,7 @@ setup(name='safeid',
       license='MIT',
       keywords='password encryption authentication',
       packages=['safeid'],
-      install_requires=['httplib2', 'pythiacrypto'],
+      install_requires=['httplib2', 'pyrelic'],
       zip_safe=False, 
       entry_points={ 'console_scripts': [ 'safeid = safeid.safeid:main' ] },
     )

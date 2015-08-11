@@ -5,13 +5,10 @@ SafeID interacts with a Pythia PRF service to protect and verify passwords.
 import argparse, json, sys
 from common import *
 from httpJson import ServiceException, fetch, extract
-
-from pyrelic.ecoprf import EcOprf
-from pythiacrypto.groups import ec224
+from pyrelic import vpop
 
 defaultServer = "https://remote-crypto.io"
-queryUrlTemplate = "{}/pythia/oquery-ecc?w={}&t={}&m={}"
-prf = EcOprf(ec224, serialize=True)
+queryUrlTemplate = "{}/pythia/eval?w={}&t={}&x={}"
 
 usage = \
 """safeid COMMAND [-s/--server https://pythia-server] [args]
@@ -71,28 +68,43 @@ def query(password, w, t, server=defaultServer, previousPubkey=None):
 		or if the server's ZKP fails verification.
 	"""
 	# Blind the password
-	r,m = prf.wrapMessage(password)
+	r,x = vpop.blind(password)
+	xSerialized = vpop.wrap(x)
 
 	# Query the service via HTTP(S) GET
-	response = fetch(queryUrlTemplate.format(server,w,t,m))
+	response = fetch(queryUrlTemplate.format(server,w,t,xSerialized))
 
 	# Grab the required fields from the response.
 	p,y,c,u = extract(response, ["p","y","c","u"])
 
-	# Verify ZKP 
-	prf.verifyZkp(w, t, m, p, y, c, u, previousPubkey)
+	# Check the pubkey
+	if previousPubkey and previousPubkey != p:
+		raise Exception("Server-provided pubkey doesn't match previous pubkey.")
+
+	# Deserialize the response fields
+	p,y,c,u = (vpop.unwrapP(p), vpop.unwrapY(y), 
+			vpop.unwrapC(c), vpop.unwrapU(u))
+
+	pi = (p,c,u)
+
+	# Verify the result by checking the proof
+	vpop.verify(x, t, y, pi)
 
 	# Deblind the result
-	z = prf.unwrapResponse(r,y)
+	z = vpop.deblind(r,y)
 
-	# Return the important fields.
-	return (z,p)
+	# Return the important fields in serialied form
+	z,p = vpop.wrap(z), vpop.wrap(p)
+	return z,p
 
 
 def main():
 	"""
 	Run the safeid command line program
 	"""
+	# DEBUG
+	process(sys.argv)
+	return
 	try:
 		process(sys.argv)
 	except Exception as e:
@@ -112,7 +124,7 @@ def process(args):
 	a = parser.parse_args(args[1:])
 
 	##
-	# Run the expected command
+	# Run the requested command
 	##
 
 	# New password
@@ -123,16 +135,25 @@ def process(args):
 	elif a.COMMAND == "check" and a.protectedPassphrase:
 
 		# Parse the encrypted password
-		w,t,z,p = json.loads(a.protectedPassphrase)
+		args = readJson(a.protectedPassphrase)
 
 		# Check the password
-		if check(a.passphrase,w,t,z,p,a.server):
+		if check(a.passphrase,*args,server=a.server):
 			print  "Password is authentic"
 		else:
 			print "Invalid password "
 
 	else:
 		print "usage: " + usage
+
+
+def readJson(text):
+	"""
+	Parses JSON array and returns (w,t,z,p) as strings.
+	"""
+	# Convert all unicode JSON results to strings. ZK proofs fail when
+	# one party uses unicode and the other uses strings.
+	return map(str, json.loads(text))
 
 
 # Run!
