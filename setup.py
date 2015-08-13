@@ -16,7 +16,7 @@ description=\
 description = ' '.join(description.split())
 
 setup(name='safeid',
-      version='1.3.1',
+      version='1.4',
       description=description,
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -33,13 +33,13 @@ setup(name='safeid',
           'Topic :: Security :: Cryptography',
           'Topic :: System :: Systems Administration :: Authentication/Directory',
       ],
-      url='https://bitbucket.org/ace0/safeid',
+      url='https://github.com/ace0/pyrelic',
       author='Adam Everspaugh',
       author_email='ace@cs.wisc.edu',
       license='MIT',
       keywords='password encryption authentication',
       packages=['safeid'],
-      install_requires=['httplib2', 'pyrelic'],
+      install_requires=['httplib2', 'pythia-pyrelic'],
       zip_safe=False, 
       entry_points={ 'console_scripts': [ 'safeid = safeid.safeid:main' ] },
     )
